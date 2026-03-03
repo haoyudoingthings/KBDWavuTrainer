@@ -15,7 +15,7 @@ Lightweight Windows overlay to practice Korean Back Dash (KBD) and wave dash (wa
 
 ## How to run
 
-1. Install dependencies: `pip install -r requirements.txt`  
+1. Install dependencies: `conda env create -f environment.yml`  
    (XInput-Python is Windows-only; the app runs without it but will not read controller input.)
 2. Use an XInput-compatible controller (Xbox or generic "Xbox mode" gamepad). DualShock users can use DS4Windows to expose the pad as XInput.
 3. Run the app: `python main.py`
