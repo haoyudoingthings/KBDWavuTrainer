@@ -5,7 +5,7 @@ Optional: show directions as Tekken-style icons if assets are present.
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from controller import ControllerReader
@@ -26,7 +26,9 @@ DIRECTION_SYMBOLS = {
     "df": "\u2199",  # ↙ (down-left, used for df)
     "ub": "\u2196",  # ↖
     "uf": "\u2197",  # ↗
+    "n": "\u00b7",   # · (neutral / no input)
 }
+REFRESH_INTERVAL_MS = 66  # ~15 FPS for history display to avoid flashing
 ICON_SIZE = 24
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
@@ -87,7 +89,8 @@ class TrainerWindow:
         self._history_canvas.configure(yscrollcommand=scrollbar.set)
         self._history_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self._history_row_widgets: list[tuple[tk.Widget, tk.Widget]] = []
+        self._history_row_widgets: list[tk.Widget] = []
+        self._refresh_after_id: Optional[str] = None
 
     def _load_icons(self) -> None:
         """Load direction icons from assets/ if present; keep references to avoid GC."""
@@ -114,11 +117,21 @@ class TrainerWindow:
         self._root.attributes("-topmost", self._topmost_var.get())
 
     def on_poll_tick(self) -> None:
-        """Called from controller poll thread: read direction, update history and matcher, then refresh UI on main thread."""
+        """Called from controller poll thread: read direction, update history and matcher. UI refresh is throttled separately."""
         direction = self._controller.get_current_direction()
         self._history.tick(direction)
         self._matcher.update()
-        self._root.after(0, self._refresh_ui)
+        self._schedule_refresh()
+
+    def _schedule_refresh(self) -> None:
+        """Schedule a single UI refresh if none pending (throttles to ~15 FPS)."""
+        if self._refresh_after_id is not None:
+            return
+        self._refresh_after_id = self._root.after(REFRESH_INTERVAL_MS, self._do_refresh)
+
+    def _do_refresh(self) -> None:
+        self._refresh_after_id = None
+        self._refresh_ui()
 
     def _refresh_ui(self) -> None:
         segs = self._history.segments_list()
@@ -126,7 +139,7 @@ class TrainerWindow:
         cur_dir, cur_frames = self._history.current_segment()
         rows: list[tuple[str, int]] = [(d, n) for d, n in display]
         if cur_dir is not None and cur_frames > 0:
-            rows.append((cur_dir, cur_frames))
+            rows.append((cur_dir, cur_frames))  # includes "n" for neutral
 
         # Rebuild history rows: direction (icon or symbol/text) + frames
         for w in self._history_row_widgets:

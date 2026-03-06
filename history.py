@@ -19,23 +19,25 @@ class InputHistory:
         """
         Call once per frame (60 FPS). If direction changed, push previous segment
         and start a new one. If same direction, increment frame count.
+        Neutral (no input) is recorded as direction "n".
         """
-        if direction is None:
-            if self._current_direction is not None:
-                self._push_current()
-            self._current_direction = None
-            self._current_frames = 0
-            return
-        if direction == self._current_direction:
+        # Treat None from controller as neutral segment "n"
+        effective = "n" if direction is None else direction
+        if effective == self._current_direction:
             self._current_frames += 1
             return
         self._push_current()
-        self._current_direction = direction
+        self._current_direction = effective
         self._current_frames = 1
 
     def _push_current(self) -> None:
         if self._current_direction is not None and self._current_frames > 0:
             self._segments.append((self._current_direction, self._current_frames))
+
+    @staticmethod
+    def is_neutral(direction: Optional[str]) -> bool:
+        """True if direction is neutral (no input)."""
+        return direction is None or direction == "n"
 
     def segments(self) -> Iterator[tuple[str, int]]:
         """Iterate over (direction, duration_frames), oldest first. Excludes current in-progress segment."""
