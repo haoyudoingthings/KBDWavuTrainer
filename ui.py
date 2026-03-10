@@ -22,8 +22,8 @@ DIRECTION_SYMBOLS = {
     "f": "\u2192",   # →
     "u": "\u2191",   # ↑
     "d": "\u2193",   # ↓
-    "db": "\u2198",  # ↘ (down-right, used for db)
-    "df": "\u2199",  # ↙ (down-left, used for df)
+    "db": "\u2199",  # ↙ (down-left = down-back)
+    "df": "\u2198",  # ↘ (down-right = down-forward)
     "ub": "\u2196",  # ↖
     "uf": "\u2197",  # ↗
     "n": "\u00b7",   # · (neutral / no input)
@@ -53,9 +53,9 @@ class TrainerWindow:
         root.title("KBD / Wavu Trainer")
         root.resizable(True, True)
         root.attributes("-topmost", True)
-        root.minsize(280, 320)
+        root.minsize(200, 220)
 
-        main = ttk.Frame(root, padding=8)
+        main = ttk.Frame(root, padding=4)
         main.pack(fill=tk.BOTH, expand=True)
 
         # Pin to top
@@ -64,22 +64,22 @@ class TrainerWindow:
         pin_cb.pack(anchor=tk.W)
 
         # Combo / streak display (DMC-style)
-        combo_frame = ttk.LabelFrame(main, text="Combo", padding=4)
-        combo_frame.pack(fill=tk.X, pady=(8, 4))
-        self._combo_label = ttk.Label(combo_frame, text="0", font=("Segoe UI", 24, "bold"))
+        combo_frame = ttk.LabelFrame(main, text="Combo", padding=2)
+        combo_frame.pack(fill=tk.X, pady=(2, 2))
+        self._combo_label = ttk.Label(combo_frame, text="0", font=("Segoe UI", 16, "bold"))
         self._combo_label.pack()
 
         # Stats: KBD and Wavu current (best) + per minute
-        stats_frame = ttk.LabelFrame(main, text="Streaks", padding=4)
-        stats_frame.pack(fill=tk.X, pady=4)
-        self._kbd_label = ttk.Label(stats_frame, text="KBD: 0 (best 0)  —  0/min")
+        stats_frame = ttk.LabelFrame(main, text="Streaks", padding=2)
+        stats_frame.pack(fill=tk.X, pady=2)
+        self._kbd_label = ttk.Label(stats_frame, text="KBD: 0 (best 0)  —  0/min", font=("Segoe UI", 9))
         self._kbd_label.pack(anchor=tk.W)
-        self._wavu_label = ttk.Label(stats_frame, text="Wavu: 0 (best 0)  —  0/min")
+        self._wavu_label = ttk.Label(stats_frame, text="Wavu: 0 (best 0)  —  0/min", font=("Segoe UI", 9))
         self._wavu_label.pack(anchor=tk.W)
 
         # Input history (scrollable list: icon or symbol + frames)
-        hist_frame = ttk.LabelFrame(main, text="Input history (direction, frames)", padding=4)
-        hist_frame.pack(fill=tk.BOTH, expand=True, pady=4)
+        hist_frame = ttk.LabelFrame(main, text="Input history (direction, frames)", padding=2)
+        hist_frame.pack(fill=tk.BOTH, expand=True, pady=2)
         self._history_canvas = tk.Canvas(hist_frame, highlightthickness=0)
         self._history_inner = ttk.Frame(self._history_canvas)
         self._history_win_id = self._history_canvas.create_window((0, 0), window=self._history_inner, anchor=tk.NW)
@@ -146,7 +146,7 @@ class TrainerWindow:
             w.destroy()
         self._history_row_widgets.clear()
         if not rows:
-            no_input = ttk.Label(self._history_inner, text="No input yet.")
+            no_input = ttk.Label(self._history_inner, text="No input yet.", font=("Segoe UI", 9))
             no_input.pack(anchor=tk.W)
             self._history_row_widgets.append(no_input)
         else:
@@ -156,8 +156,8 @@ class TrainerWindow:
                     dir_label = ttk.Label(row_frame, image=self._icons[d])
                 else:
                     sym = DIRECTION_SYMBOLS.get(d, d)
-                    dir_label = ttk.Label(row_frame, text=sym, font=("Segoe UI", 12), width=2)
-                frame_label = ttk.Label(row_frame, text=str(n), font=("Consolas", 10))
+                    dir_label = ttk.Label(row_frame, text=sym, font=("Segoe UI", 10), width=2)
+                frame_label = ttk.Label(row_frame, text=str(n), font=("Consolas", 9))
                 dir_label.pack(side=tk.LEFT, padx=(0, 4))
                 frame_label.pack(side=tk.LEFT)
                 row_frame.pack(anchor=tk.W)
