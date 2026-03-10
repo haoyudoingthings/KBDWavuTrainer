@@ -1,44 +1,44 @@
 """
 Pattern detection for KBD (Korean Back Dash) and wavu (wave dash).
 Sliding window over input history; reports match and consecutive count.
+Sequences are tuples of direction symbols (e.g. 'b', 'n', 'db'); change
+KBD_SEQUENCE / WAVU_SEQUENCE and the rest of the code adapts.
 """
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence, Tuple
 
 if TYPE_CHECKING:
     from history import InputHistory
     from scoring import Scoring
 
-# KBD: alternating b and db (b -> db -> b -> db ...). One "cycle" = one (b, db) or (db, b).
-KBD_SEQUENCE = ("b", "db")
+# KBD: b n b (db b n b) * n
+KBD_SEQUENCE: Tuple[str, ...] = ('b', 'n', 'b', 'db')
 
-# Wavu: alternating d and df (d -> df -> d -> df ...).
-WAVU_SEQUENCE = ("d", "df")
+# Wavu: f n d df (n f n d df) * n
+WAVU_SEQUENCE: Tuple[str, ...] = ('f', 'n', 'd', 'df', 'n')
 
 
-def _count_tail_cycles(segments: list[tuple[str, int]], pattern: tuple[str, str]) -> int:
+def _count_tail_cycles(segments: list[tuple[str, int]], pattern: Sequence[str]) -> int:
     """
-    Count how many full cycles of the two-step pattern appear at the tail.
-    Pattern is (first, second) e.g. ("b", "db"). Counts (first, second) pairs from the end.
+    Count how many full repetitions of the pattern appear at the tail of segments.
+    Pattern can be any length (e.g. 2-step or 4-step). Each "cycle" is one full
+    match of the pattern from the end (last segment = last element of pattern).
     """
-    if len(pattern) != 2 or not segments:
+    n = len(pattern)
+    if n == 0 or not segments:
         return 0
-    first, second = pattern
     count = 0
     i = len(segments) - 1
-    while i >= 0:
-        if segments[i][0] != second:
-            break
-        if i == 0:
-            break
-        if segments[i - 1][0] != first:
-            break
+    while i >= n - 1:
+        for j in range(n):
+            if segments[i - j][0] != pattern[n - 1 - j]:
+                return count
         count += 1
-        i -= 2
+        i -= n
     return count
 
 
-def _tail_matches(segments: list[tuple[str, int]], pattern: tuple[str, str], min_cycles: int = 1) -> bool:
-    """True if the tail has at least min_cycles full cycles of (first, second)."""
+def _tail_matches(segments: list[tuple[str, int]], pattern: Sequence[str], min_cycles: int = 1) -> bool:
+    """True if the tail has at least min_cycles full repetitions of the pattern."""
     return _count_tail_cycles(segments, pattern) >= min_cycles
 
 
