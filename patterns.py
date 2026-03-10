@@ -20,21 +20,33 @@ WAVU_SEQUENCE: Tuple[str, ...] = ('f', 'n', 'd', 'df', 'n')
 def _count_tail_cycles(segments: list[tuple[str, int]], pattern: Sequence[str]) -> int:
     """
     Count how many full repetitions of the pattern appear at the tail of segments.
-    Pattern can be any length (e.g. 2-step or 4-step). Each "cycle" is one full
-    match of the pattern from the end (last segment = last element of pattern).
+    Only complete cycles are counted: if the last cycle is partial (e.g. 5 done,
+    6th half done), we return 5, not 0. We do this by trying to ignore 0..n-1
+    trailing segments and taking the maximum count of full cycles in the remainder.
     """
     n = len(pattern)
     if n == 0 or not segments:
         return 0
-    count = 0
-    i = len(segments) - 1
-    while i >= n - 1:
-        for j in range(n):
-            if segments[i - j][0] != pattern[n - 1 - j]:
-                return count
-        count += 1
-        i -= n
-    return count
+
+    def count_from_tail(seg_list: list[tuple[str, int]]) -> int:
+        """Count full pattern repetitions at the end of seg_list (tail must end with pattern)."""
+        cnt = 0
+        i = len(seg_list) - 1
+        while i >= n - 1:
+            for j in range(n):
+                if seg_list[i - j][0] != pattern[n - 1 - j]:
+                    return cnt
+            cnt += 1
+            i -= n
+        return cnt
+
+    best = 0
+    for k in range(n):
+        tail = segments[: len(segments) - k] if k else segments
+        if len(tail) < n:
+            continue
+        best = max(best, count_from_tail(tail))
+    return best
 
 
 def _tail_matches(segments: list[tuple[str, int]], pattern: Sequence[str], min_cycles: int = 1) -> bool:
