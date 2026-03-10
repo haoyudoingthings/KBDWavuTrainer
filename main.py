@@ -9,23 +9,33 @@ from patterns import PatternMatcher
 from scoring import Scoring
 from ui import TrainerWindow
 
+GAME_LOOP_MS = 16  # ~60 FPS
+
 
 def main() -> None:
     root = tk.Tk()
-    history = InputHistory(max_segments=120)  # ~2 sec at 60 fps if 1 segment/sec
+    history = InputHistory(max_segments=120)
     scoring = Scoring()
     matcher = PatternMatcher(history, scoring)
     controller = ControllerReader()
 
-    app = TrainerWindow(root, history, scoring, matcher, controller)
-    controller.start_polling(app.on_poll_tick)
+    app = TrainerWindow(root, history, scoring)
+    controller.start_polling()
 
-    root.protocol("WM_DELETE_WINDOW", lambda: shutdown(root, controller))
+    def game_loop() -> None:
+        for direction in controller.drain():
+            history.tick(direction)
+            matcher.update()
+        root.after(GAME_LOOP_MS, game_loop)
+
+    root.after(GAME_LOOP_MS, game_loop)
+    root.protocol("WM_DELETE_WINDOW", lambda: shutdown(root, controller, scoring))
     root.mainloop()
 
 
-def shutdown(root: tk.Tk, controller: ControllerReader) -> None:
+def shutdown(root: tk.Tk, controller: ControllerReader, scoring: Scoring) -> None:
     controller.stop_polling()
+    scoring.save()
     root.destroy()
 
 

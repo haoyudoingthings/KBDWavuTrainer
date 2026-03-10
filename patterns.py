@@ -4,17 +4,19 @@ Sliding window over input history; reports match and consecutive count.
 Sequences are tuples of direction symbols (e.g. 'b', 'n', 'db'); change
 KBD_SEQUENCE / WAVU_SEQUENCE and the rest of the code adapts.
 """
-from typing import TYPE_CHECKING, Sequence, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
     from history import InputHistory
     from scoring import Scoring
 
 # KBD: b n b (db b n b) * n
-KBD_SEQUENCE: Tuple[str, ...] = ('b', 'n', 'b', 'db')
+KBD_SEQUENCE: tuple[str, ...] = ('b', 'n', 'b', 'db')
 
 # Wavu: f n d df (n f n d df) * n
-WAVU_SEQUENCE: Tuple[str, ...] = ('f', 'n', 'd', 'df', 'n')
+WAVU_SEQUENCE: tuple[str, ...] = ('f', 'n', 'd', 'df', 'n')
 
 
 def _count_tail_cycles(segments: list[tuple[str, int]], pattern: Sequence[str]) -> int:
@@ -57,7 +59,7 @@ def _tail_matches(segments: list[tuple[str, int]], pattern: Sequence[str], min_c
 class PatternMatcher:
     """Checks input history for KBD and wavu, updates scoring on match."""
 
-    def __init__(self, history: "InputHistory", scoring: "Scoring") -> None:
+    def __init__(self, history: InputHistory, scoring: Scoring) -> None:
         self._history = history
         self._scoring = scoring
         self._last_kbd_cycles = 0

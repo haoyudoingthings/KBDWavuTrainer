@@ -3,8 +3,10 @@ Input history: bounded deque of (direction, duration_frames).
 When direction changes, finalize the previous segment and start a new one.
 Assumes 60 FPS (one tick = one frame).
 """
+from __future__ import annotations
+
 from collections import deque
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Optional
 
 
 class InputHistory:
@@ -21,7 +23,6 @@ class InputHistory:
         and start a new one. If same direction, increment frame count.
         Neutral (no input) is recorded as direction "n".
         """
-        # Treat None from controller as neutral segment "n"
         effective = "n" if direction is None else direction
         if effective == self._current_direction:
             self._current_frames += 1
@@ -47,7 +48,7 @@ class InputHistory:
         """Return a copy of segments (oldest first)."""
         return list(self._segments)
 
-    def current_segment(self) -> Tuple[Optional[str], int]:
+    def current_segment(self) -> tuple[Optional[str], int]:
         """Current direction and its frame count so far (may not be pushed yet)."""
         return (self._current_direction, self._current_frames)
 

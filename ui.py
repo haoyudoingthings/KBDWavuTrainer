@@ -2,21 +2,19 @@
 Trainer window: input history with frame counts, KBD/wavu streaks, combo-style score, pin-to-top.
 Optional: show directions as Tekken-style icons if assets are present.
 """
+from __future__ import annotations
+
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from controller import ControllerReader
     from history import InputHistory
-    from patterns import PatternMatcher
     from scoring import Scoring
 
-# Display last N segments in history
 HISTORY_DISPLAY_LIMIT = 20
 DIRECTIONS = ("b", "f", "u", "d", "db", "df", "ub", "uf")
-# Unicode arrows as fallback when no icon assets (readable approximation of notation)
 DIRECTION_SYMBOLS = {
     "b": "\u2190",   # ←
     "f": "\u2192",   # →
@@ -28,7 +26,7 @@ DIRECTION_SYMBOLS = {
     "uf": "\u2197",  # ↗
     "n": "\u00b7",   # · (neutral / no input)
 }
-REFRESH_INTERVAL_MS = 66  # ~15 FPS for history display to avoid flashing
+REFRESH_INTERVAL_MS = 66  # ~15 FPS
 ICON_SIZE = 24
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
@@ -37,16 +35,12 @@ class TrainerWindow:
     def __init__(
         self,
         root: tk.Tk,
-        history: "InputHistory",
-        scoring: "Scoring",
-        matcher: "PatternMatcher",
-        controller: "ControllerReader",
+        history: InputHistory,
+        scoring: Scoring,
     ) -> None:
         self._root = root
         self._history = history
         self._scoring = scoring
-        self._matcher = matcher
-        self._controller = controller
         self._icons: dict[str, tk.PhotoImage] = {}
         self._load_icons()
 
@@ -58,26 +52,22 @@ class TrainerWindow:
         main = ttk.Frame(root, padding=4)
         main.pack(fill=tk.BOTH, expand=True)
 
-        # Pin to top
         self._topmost_var = tk.BooleanVar(value=True)
         pin_cb = ttk.Checkbutton(main, text="Pin to top", variable=self._topmost_var, command=self._on_pin_toggle)
         pin_cb.pack(anchor=tk.W)
 
-        # Combo / streak display (DMC-style)
         combo_frame = ttk.LabelFrame(main, text="Combo", padding=2)
         combo_frame.pack(fill=tk.X, pady=(2, 2))
         self._combo_label = ttk.Label(combo_frame, text="0", font=("Segoe UI", 16, "bold"))
         self._combo_label.pack()
 
-        # Stats: KBD and Wavu current (best) + per minute
         stats_frame = ttk.LabelFrame(main, text="Streaks", padding=2)
         stats_frame.pack(fill=tk.X, pady=2)
-        self._kbd_label = ttk.Label(stats_frame, text="KBD: 0 (best 0)  —  0/min", font=("Segoe UI", 9))
+        self._kbd_label = ttk.Label(stats_frame, text="KBD: 0 (best 0)  \u2014  0/min", font=("Segoe UI", 9))
         self._kbd_label.pack(anchor=tk.W)
-        self._wavu_label = ttk.Label(stats_frame, text="Wavu: 0 (best 0)  —  0/min", font=("Segoe UI", 9))
+        self._wavu_label = ttk.Label(stats_frame, text="Wavu: 0 (best 0)  \u2014  0/min", font=("Segoe UI", 9))
         self._wavu_label.pack(anchor=tk.W)
 
-        # Input history (scrollable list: icon or symbol + frames)
         hist_frame = ttk.LabelFrame(main, text="Input history (direction, frames)", padding=2)
         hist_frame.pack(fill=tk.BOTH, expand=True, pady=2)
         self._history_canvas = tk.Canvas(hist_frame, highlightthickness=0)
@@ -89,8 +79,20 @@ class TrainerWindow:
         self._history_canvas.configure(yscrollcommand=scrollbar.set)
         self._history_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self._history_row_widgets: list[tk.Widget] = []
-        self._refresh_after_id: Optional[str] = None
+
+        max_rows = HISTORY_DISPLAY_LIMIT + 1
+        self._row_widgets: list[tuple[ttk.Frame, ttk.Label, ttk.Label]] = []
+        for _ in range(max_rows):
+            row_frame = ttk.Frame(self._history_inner)
+            dir_label = ttk.Label(row_frame, font=("Segoe UI", 10), width=2)
+            frame_label = ttk.Label(row_frame, font=("Consolas", 9))
+            dir_label.pack(side=tk.LEFT, padx=(0, 4))
+            frame_label.pack(side=tk.LEFT)
+            self._row_widgets.append((row_frame, dir_label, frame_label))
+        self._no_input_label = ttk.Label(self._history_inner, text="No input yet.", font=("Segoe UI", 9))
+        self._visible_rows = 0
+
+        self._start_refresh_loop()
 
     def _load_icons(self) -> None:
         """Load direction icons from assets/ if present; keep references to avoid GC."""
@@ -102,7 +104,6 @@ class TrainerWindow:
                 continue
             try:
                 img = tk.PhotoImage(file=str(path))
-                # Scale down if larger than ICON_SIZE
                 w, h = img.width(), img.height()
                 if w > ICON_SIZE or h > ICON_SIZE:
                     img = img.subsample(max(1, w // ICON_SIZE), max(1, h // ICON_SIZE))
@@ -116,60 +117,46 @@ class TrainerWindow:
     def _on_pin_toggle(self) -> None:
         self._root.attributes("-topmost", self._topmost_var.get())
 
-    def on_poll_tick(self) -> None:
-        """Called from controller poll thread: read direction, update history and matcher. UI refresh is throttled separately."""
-        direction = self._controller.get_current_direction()
-        self._history.tick(direction)
-        self._matcher.update()
-        self._schedule_refresh()
-
-    def _schedule_refresh(self) -> None:
-        """Schedule a single UI refresh if none pending (throttles to ~15 FPS)."""
-        if self._refresh_after_id is not None:
-            return
-        self._refresh_after_id = self._root.after(REFRESH_INTERVAL_MS, self._do_refresh)
-
-    def _do_refresh(self) -> None:
-        self._refresh_after_id = None
+    def _start_refresh_loop(self) -> None:
+        """Self-scheduling UI refresh at ~15 FPS."""
         self._refresh_ui()
+        self._root.after(REFRESH_INTERVAL_MS, self._start_refresh_loop)
 
     def _refresh_ui(self) -> None:
         segs = self._history.segments_list()
         display = segs[-HISTORY_DISPLAY_LIMIT:] if len(segs) > HISTORY_DISPLAY_LIMIT else segs
         cur_dir, cur_frames = self._history.current_segment()
-        rows: list[tuple[str, int]] = [(d, n) for d, n in display]
+        rows: list[tuple[str, int]] = list(display)
         if cur_dir is not None and cur_frames > 0:
-            rows.append((cur_dir, cur_frames))  # includes "n" for neutral
+            rows.append((cur_dir, cur_frames))
 
-        # Rebuild history rows: direction (icon or symbol/text) + frames
-        for w in self._history_row_widgets:
-            w.destroy()
-        self._history_row_widgets.clear()
         if not rows:
-            no_input = ttk.Label(self._history_inner, text="No input yet.", font=("Segoe UI", 9))
-            no_input.pack(anchor=tk.W)
-            self._history_row_widgets.append(no_input)
+            for i in range(self._visible_rows):
+                self._row_widgets[i][0].grid_forget()
+            self._visible_rows = 0
+            self._no_input_label.grid(row=0, sticky=tk.W)
         else:
-            for d, n in rows:
-                row_frame = ttk.Frame(self._history_inner)
+            self._no_input_label.grid_forget()
+            for idx, (d, n) in enumerate(rows):
+                row_frame, dir_label, frame_label = self._row_widgets[idx]
                 if d in self._icons:
-                    dir_label = ttk.Label(row_frame, image=self._icons[d])
+                    dir_label.configure(image=self._icons[d], text="")
                 else:
                     sym = DIRECTION_SYMBOLS.get(d, d)
-                    dir_label = ttk.Label(row_frame, text=sym, font=("Segoe UI", 10), width=2)
-                frame_label = ttk.Label(row_frame, text=str(n), font=("Consolas", 9))
-                dir_label.pack(side=tk.LEFT, padx=(0, 4))
-                frame_label.pack(side=tk.LEFT)
-                row_frame.pack(anchor=tk.W)
-                self._history_row_widgets.append(row_frame)
+                    dir_label.configure(image="", text=sym)
+                frame_label.configure(text=str(n))
+                if idx >= self._visible_rows:
+                    row_frame.grid(row=idx, sticky=tk.W)
+            for i in range(len(rows), self._visible_rows):
+                self._row_widgets[i][0].grid_forget()
+            self._visible_rows = len(rows)
 
-        # Combo: show max of current KBD and Wavu streak
         combo = max(self._scoring.kbd_current(), self._scoring.wavu_current())
         self._combo_label.configure(text=str(combo))
 
         self._kbd_label.configure(
-            text=f"KBD: {self._scoring.kbd_current()} (best {self._scoring.kbd_high})  —  {self._scoring.kbd_per_minute():.1f}/min"
+            text=f"KBD: {self._scoring.kbd_current()} (best {self._scoring.kbd_high()})  \u2014  {self._scoring.kbd_per_minute():.1f}/min"
         )
         self._wavu_label.configure(
-            text=f"Wavu: {self._scoring.wavu_current()} (best {self._scoring.wavu_high})  —  {self._scoring.wavu_per_minute():.1f}/min"
+            text=f"Wavu: {self._scoring.wavu_current()} (best {self._scoring.wavu_high()})  \u2014  {self._scoring.wavu_per_minute():.1f}/min"
         )
