@@ -7,9 +7,10 @@ from __future__ import annotations
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
+    from controller import ControllerReader
     from history import InputHistory
     from scoring import Scoring
 
@@ -30,6 +31,9 @@ REFRESH_INTERVAL_MS = 66  # ~15 FPS
 ICON_SIZE = 24
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
+COLOR_CONNECTED = "#2e7d32"
+COLOR_DISCONNECTED = "#b71c1c"
+
 
 class TrainerWindow:
     def __init__(
@@ -37,30 +41,50 @@ class TrainerWindow:
         root: tk.Tk,
         history: InputHistory,
         scoring: Scoring,
+        controller: ControllerReader,
+        on_reset: Callable[[], None],
     ) -> None:
         self._root = root
         self._history = history
         self._scoring = scoring
+        self._controller = controller
+        self._on_reset = on_reset
         self._icons: dict[str, tk.PhotoImage] = {}
         self._load_icons()
 
         root.title("KBD / Wavu Trainer")
         root.resizable(True, True)
         root.attributes("-topmost", True)
-        root.minsize(200, 220)
+        root.minsize(220, 280)
 
         main = ttk.Frame(root, padding=4)
         main.pack(fill=tk.BOTH, expand=True)
 
-        self._topmost_var = tk.BooleanVar(value=True)
-        pin_cb = ttk.Checkbutton(main, text="Pin to top", variable=self._topmost_var, command=self._on_pin_toggle)
-        pin_cb.pack(anchor=tk.W)
+        # --- Controller status ---
+        self._status_label = tk.Label(
+            main, text="\u25cf Controller: Disconnected",
+            font=("Segoe UI", 9), fg=COLOR_DISCONNECTED, anchor=tk.W,
+        )
+        self._status_label.pack(fill=tk.X, pady=(0, 2))
 
+        # --- Controls row: pin + reset ---
+        controls_frame = ttk.Frame(main)
+        controls_frame.pack(fill=tk.X, pady=2)
+
+        self._topmost_var = tk.BooleanVar(value=True)
+        pin_cb = ttk.Checkbutton(controls_frame, text="Pin to top", variable=self._topmost_var, command=self._on_pin_toggle)
+        pin_cb.pack(side=tk.LEFT)
+
+        reset_btn = ttk.Button(controls_frame, text="Reset", width=6, command=self._on_reset_click)
+        reset_btn.pack(side=tk.RIGHT)
+
+        # --- Combo display ---
         combo_frame = ttk.LabelFrame(main, text="Combo", padding=2)
-        combo_frame.pack(fill=tk.X, pady=(2, 2))
+        combo_frame.pack(fill=tk.X, pady=2)
         self._combo_label = ttk.Label(combo_frame, text="0", font=("Segoe UI", 16, "bold"))
         self._combo_label.pack()
 
+        # --- Streaks ---
         stats_frame = ttk.LabelFrame(main, text="Streaks", padding=2)
         stats_frame.pack(fill=tk.X, pady=2)
         self._kbd_label = ttk.Label(stats_frame, text="KBD: 0 (best 0)  \u2014  0/min", font=("Segoe UI", 9))
@@ -68,6 +92,7 @@ class TrainerWindow:
         self._wavu_label = ttk.Label(stats_frame, text="Wavu: 0 (best 0)  \u2014  0/min", font=("Segoe UI", 9))
         self._wavu_label.pack(anchor=tk.W)
 
+        # --- Input history ---
         hist_frame = ttk.LabelFrame(main, text="Input history (direction, frames)", padding=2)
         hist_frame.pack(fill=tk.BOTH, expand=True, pady=2)
         self._history_canvas = tk.Canvas(hist_frame, highlightthickness=0)
@@ -117,12 +142,22 @@ class TrainerWindow:
     def _on_pin_toggle(self) -> None:
         self._root.attributes("-topmost", self._topmost_var.get())
 
+    def _on_reset_click(self) -> None:
+        self._on_reset()
+
     def _start_refresh_loop(self) -> None:
         """Self-scheduling UI refresh at ~15 FPS."""
         self._refresh_ui()
         self._root.after(REFRESH_INTERVAL_MS, self._start_refresh_loop)
 
     def _refresh_ui(self) -> None:
+        # --- Connection status ---
+        if self._controller.connected:
+            self._status_label.configure(text="\u25cf Controller: Connected", fg=COLOR_CONNECTED)
+        else:
+            self._status_label.configure(text="\u25cf Controller: Disconnected", fg=COLOR_DISCONNECTED)
+
+        # --- Input history rows ---
         segs = self._history.segments_list()
         display = segs[-HISTORY_DISPLAY_LIMIT:] if len(segs) > HISTORY_DISPLAY_LIMIT else segs
         cur_dir, cur_frames = self._history.current_segment()
@@ -151,6 +186,7 @@ class TrainerWindow:
                 self._row_widgets[i][0].grid_forget()
             self._visible_rows = len(rows)
 
+        # --- Combo & streaks ---
         combo = max(self._scoring.kbd_current(), self._scoring.wavu_current())
         self._combo_label.configure(text=str(combo))
 

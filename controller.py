@@ -61,22 +61,57 @@ def _dpad_to_direction(buttons: dict) -> Optional[str]:
 
 
 class ControllerReader:
-    """Polls first connected XInput controller at 60 FPS and queues directions."""
+    """Polls an XInput controller at 60 FPS and queues directions."""
+
+    MAX_SLOTS = 4
 
     def __init__(self, user_index: int = 0):
         self._user_index = user_index
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._queue: queue.Queue[Optional[str]] = queue.Queue()
+        self._connected = False
+
+    @property
+    def user_index(self) -> int:
+        return self._user_index
+
+    @property
+    def connected(self) -> bool:
+        """Whether the currently selected controller slot is connected (updated by poll thread)."""
+        return self._connected
+
+    def set_user_index(self, index: int) -> None:
+        """Switch to a different controller slot. Drains stale readings from the queue."""
+        self._user_index = index
+        self._connected = False
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+
+    @staticmethod
+    def get_connected_slots() -> list[int]:
+        """Return list of slot indices (0-3) that have a controller connected."""
+        if XInput is None:
+            return []
+        try:
+            return [i for i, c in enumerate(XInput.get_connected()) if c]
+        except Exception:
+            return []
 
     def get_current_direction(self) -> Optional[str]:
         """Return current 8-way direction from left stick or D-pad, or None if neutral."""
         if XInput is None:
+            self._connected = False
             return None
         try:
             state = XInput.get_state(self._user_index)
         except (XInput.XInputNotConnectedError, XInput.XInputBadArgumentError):
+            self._connected = False
             return None
+        self._connected = True
         (lx, ly), _ = XInput.get_thumb_values(state)
         direction = _stick_to_direction(lx, ly)
         if direction is None:

@@ -91,6 +91,13 @@ class Scoring:
             return 0.0
         return len(self._wavu_times) / (span / 60.0)
 
+    def reset_session(self) -> None:
+        """Reset current streaks and frequency timestamps. High scores are kept."""
+        self._kbd_current = 0
+        self._wavu_current = 0
+        self._kbd_times.clear()
+        self._wavu_times.clear()
+
     def save(self) -> None:
         """Persist high scores to disk. Call on app exit."""
         try:

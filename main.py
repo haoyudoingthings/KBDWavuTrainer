@@ -19,7 +19,12 @@ def main() -> None:
     matcher = PatternMatcher(history, scoring)
     controller = ControllerReader()
 
-    app = TrainerWindow(root, history, scoring)
+    def reset_session() -> None:
+        history.clear()
+        scoring.reset_session()
+        matcher.reset()
+
+    app = TrainerWindow(root, history, scoring, controller, on_reset=reset_session)
     controller.start_polling()
 
     def game_loop() -> None:

@@ -65,6 +65,11 @@ class PatternMatcher:
         self._last_kbd_cycles = 0
         self._last_wavu_cycles = 0
 
+    def reset(self) -> None:
+        """Clear cycle tracking. Call when history is cleared."""
+        self._last_kbd_cycles = 0
+        self._last_wavu_cycles = 0
+
     def update(self) -> None:
         """
         Run after history is updated. Check tail for KBD and wavu;
