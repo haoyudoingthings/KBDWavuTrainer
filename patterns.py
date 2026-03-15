@@ -18,6 +18,13 @@ ROUTINES: dict[str, tuple[str, ...]] = {
 
 DEFAULT_ROUTINE = "KBD"
 
+_MIRROR_LR: dict[str, str] = {
+    "b": "f", "f": "b",
+    "db": "df", "df": "db",
+    "ub": "uf", "uf": "ub",
+    "u": "u", "d": "d", "n": "n",
+}
+
 
 def _count_tail_cycles(segments: list[tuple[str, int]], pattern: Sequence[str]) -> int:
     """
@@ -56,12 +63,24 @@ class PatternMatcher:
     def __init__(self, history: InputHistory, scoring: Scoring, routine: str = DEFAULT_ROUTINE) -> None:
         self._history = history
         self._scoring = scoring
+        self._routine = routine
+        self._p2 = False
         self._pattern = ROUTINES[routine]
         self._last_cycles = 0
 
     def set_routine(self, name: str) -> None:
         """Switch to a different routine pattern and reset cycle tracking."""
-        self._pattern = ROUTINES[name]
+        self._routine = name
+        self._rebuild_pattern()
+
+    def set_side(self, p2: bool) -> None:
+        """Switch P1/P2 side. Mirrors the pattern so physical inputs match correctly."""
+        self._p2 = p2
+        self._rebuild_pattern()
+
+    def _rebuild_pattern(self) -> None:
+        base = ROUTINES[self._routine]
+        self._pattern = tuple(_MIRROR_LR[d] for d in base) if self._p2 else base
         self._last_cycles = 0
 
     def reset(self) -> None:

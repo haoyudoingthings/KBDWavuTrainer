@@ -42,6 +42,7 @@ class TrainerWindow:
         controller: ControllerReader,
         on_reset: Callable[[], None],
         on_switch: Callable[[str], None],
+        on_side: Callable[[bool], None],
     ) -> None:
         self._root = root
         self._history = history
@@ -49,6 +50,7 @@ class TrainerWindow:
         self._controller = controller
         self._on_reset = on_reset
         self._on_switch = on_switch
+        self._on_side = on_side
 
         root.title(TITLE_BASE)
         root.resizable(True, True)
@@ -74,6 +76,14 @@ class TrainerWindow:
                                          value=name, command=self._on_routine_change)
         menubar.add_cascade(label="Routine", menu=routine_menu)
 
+        side_menu = tk.Menu(menubar, tearoff=False)
+        self._side_var = tk.StringVar(value="P1")
+        side_menu.add_radiobutton(label="P1 (face right)", variable=self._side_var,
+                                  value="P1", command=self._on_side_change)
+        side_menu.add_radiobutton(label="P2 (face left)", variable=self._side_var,
+                                  value="P2", command=self._on_side_change)
+        menubar.add_cascade(label="Side", menu=side_menu)
+
         # --- Combo label ---
         self._combo_label = tk.Label(root, text="", font=COMBO_FONT)
         self._combo_label.pack(fill=tk.X, pady=(2, 0))
@@ -91,6 +101,9 @@ class TrainerWindow:
 
     def _on_routine_change(self) -> None:
         self._on_switch(self._routine_var.get())
+
+    def _on_side_change(self) -> None:
+        self._on_side(self._side_var.get() == "P2")
 
     def _start_refresh_loop(self) -> None:
         self._refresh_ui()

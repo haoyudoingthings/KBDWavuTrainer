@@ -29,8 +29,14 @@ def main() -> None:
         scoring.set_routine(name)
         matcher.set_routine(name)
 
+    def set_side(p2: bool) -> None:
+        history.clear()
+        scoring.reset_session()
+        matcher.set_side(p2)
+
     app = TrainerWindow(root, history, scoring, controller,
-                        on_reset=reset_session, on_switch=switch_routine)
+                        on_reset=reset_session, on_switch=switch_routine,
+                        on_side=set_side)
     controller.start_polling()
 
     def game_loop() -> None:
