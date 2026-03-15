@@ -1,8 +1,7 @@
 """
-Pattern detection for KBD (Korean Back Dash) and wavu (wave dash).
+Pattern detection for configurable routines (KBD, wavu, etc.).
 Sliding window over input history; reports match and consecutive count.
-Sequences are tuples of direction symbols (e.g. 'b', 'n', 'db'); change
-KBD_SEQUENCE / WAVU_SEQUENCE and the rest of the code adapts.
+Add new routines by inserting an entry into the ROUTINES dict.
 """
 from __future__ import annotations
 
@@ -12,11 +11,12 @@ if TYPE_CHECKING:
     from history import InputHistory
     from scoring import Scoring
 
-# KBD: b n b (db b n b) * n
-KBD_SEQUENCE: tuple[str, ...] = ('b', 'n', 'b', 'db')
+ROUTINES: dict[str, tuple[str, ...]] = {
+    "KBD":  ('b', 'n', 'b', 'db'),
+    "Wavu": ('f', 'n', 'd', 'df', 'n'),
+}
 
-# Wavu: f n d df (n f n d df) * n
-WAVU_SEQUENCE: tuple[str, ...] = ('f', 'n', 'd', 'df', 'n')
+DEFAULT_ROUTINE = "KBD"
 
 
 def _count_tail_cycles(segments: list[tuple[str, int]], pattern: Sequence[str]) -> int:
@@ -31,7 +31,6 @@ def _count_tail_cycles(segments: list[tuple[str, int]], pattern: Sequence[str]) 
         return 0
 
     def count_from_tail(seg_list: list[tuple[str, int]]) -> int:
-        """Count full pattern repetitions at the end of seg_list (tail must end with pattern)."""
         cnt = 0
         i = len(seg_list) - 1
         while i >= n - 1:
@@ -51,47 +50,34 @@ def _count_tail_cycles(segments: list[tuple[str, int]], pattern: Sequence[str]) 
     return best
 
 
-def _tail_matches(segments: list[tuple[str, int]], pattern: Sequence[str], min_cycles: int = 1) -> bool:
-    """True if the tail has at least min_cycles full repetitions of the pattern."""
-    return _count_tail_cycles(segments, pattern) >= min_cycles
-
-
 class PatternMatcher:
-    """Checks input history for KBD and wavu, updates scoring on match."""
+    """Checks input history for the active routine's pattern and updates scoring."""
 
-    def __init__(self, history: InputHistory, scoring: Scoring) -> None:
+    def __init__(self, history: InputHistory, scoring: Scoring, routine: str = DEFAULT_ROUTINE) -> None:
         self._history = history
         self._scoring = scoring
-        self._last_kbd_cycles = 0
-        self._last_wavu_cycles = 0
+        self._pattern = ROUTINES[routine]
+        self._last_cycles = 0
+
+    def set_routine(self, name: str) -> None:
+        """Switch to a different routine pattern and reset cycle tracking."""
+        self._pattern = ROUTINES[name]
+        self._last_cycles = 0
 
     def reset(self) -> None:
         """Clear cycle tracking. Call when history is cleared."""
-        self._last_kbd_cycles = 0
-        self._last_wavu_cycles = 0
+        self._last_cycles = 0
 
     def update(self) -> None:
-        """
-        Run after history is updated. Check tail for KBD and wavu;
-        update scoring with consecutive counts and record success for frequency.
-        """
+        """Run after history is updated. Check tail for the active pattern."""
         segs = self._history.segments_list()
-        kbd_cycles = _count_tail_cycles(segs, KBD_SEQUENCE)
-        wavu_cycles = _count_tail_cycles(segs, WAVU_SEQUENCE)
+        cycles = _count_tail_cycles(segs, self._pattern)
 
-        if kbd_cycles > 0:
-            self._scoring.record_kbd_consecutive(kbd_cycles)
-            if kbd_cycles > self._last_kbd_cycles:
-                self._scoring.record_kbd_success()
+        if cycles > 0 and cycles >= self._last_cycles:
+            self._scoring.record_consecutive(cycles)
+            if cycles > self._last_cycles:
+                self._scoring.record_success()
         else:
-            self._scoring.reset_kbd_streak()
+            self._scoring.reset_streak()
 
-        if wavu_cycles > 0:
-            self._scoring.record_wavu_consecutive(wavu_cycles)
-            if wavu_cycles > self._last_wavu_cycles:
-                self._scoring.record_wavu_success()
-        else:
-            self._scoring.reset_wavu_streak()
-
-        self._last_kbd_cycles = kbd_cycles
-        self._last_wavu_cycles = wavu_cycles
+        self._last_cycles = cycles

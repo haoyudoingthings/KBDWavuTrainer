@@ -24,7 +24,13 @@ def main() -> None:
         scoring.reset_session()
         matcher.reset()
 
-    app = TrainerWindow(root, history, scoring, controller, on_reset=reset_session)
+    def switch_routine(name: str) -> None:
+        history.clear()
+        scoring.set_routine(name)
+        matcher.set_routine(name)
+
+    app = TrainerWindow(root, history, scoring, controller,
+                        on_reset=reset_session, on_switch=switch_routine)
     controller.start_polling()
 
     def game_loop() -> None:

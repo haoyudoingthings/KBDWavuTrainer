@@ -1,6 +1,5 @@
 """
-Current and highest streak per technique (KBD, wavu), plus frequency (e.g. per minute).
-Optional persistence to JSON.
+Streak tracking and per-routine high scores with optional JSON persistence.
 """
 from __future__ import annotations
 
@@ -12,99 +11,78 @@ from typing import Optional, Union
 
 
 def _scores_path() -> Path:
-    base = Path(__file__).resolve().parent
-    return base / "scores.json"
+    return Path(__file__).resolve().parent / "scores.json"
 
 
 FREQUENCY_WINDOW_SEC = 60.0
 
 
 class Scoring:
-    """Tracks current/highest streak and frequency for KBD and wavu."""
+    """Tracks current streak, per-routine high scores, and success frequency."""
 
-    def __init__(self, persist_path: Optional[Union[Path, str]] = None) -> None:
+    def __init__(self, persist_path: Optional[Union[Path, str]] = None,
+                 routine: str = "KBD") -> None:
         self._persist_path = Path(persist_path) if persist_path else _scores_path()
-        self._kbd_current = 0
-        self._kbd_high = 0
-        self._wavu_current = 0
-        self._wavu_high = 0
-        self._kbd_times: deque[float] = deque()
-        self._wavu_times: deque[float] = deque()
+        self._routine = routine
+        self._current = 0
+        self._high_scores: dict[str, int] = {}
+        self._times: deque[float] = deque()
         self._load()
 
-    def record_kbd_consecutive(self, count: int) -> None:
-        self._kbd_current = count
-        if count > self._kbd_high:
-            self._kbd_high = count
+    @property
+    def routine(self) -> str:
+        return self._routine
 
-    def record_kbd_success(self) -> None:
-        self._kbd_times.append(time.perf_counter())
-        self._prune_times(self._kbd_times)
+    def set_routine(self, name: str) -> None:
+        """Switch active routine. Resets current streak and frequency."""
+        self._routine = name
+        self._current = 0
+        self._times.clear()
 
-    def reset_kbd_streak(self) -> None:
-        self._kbd_current = 0
+    def record_consecutive(self, count: int) -> None:
+        self._current = count
+        if count > self._high_scores.get(self._routine, 0):
+            self._high_scores[self._routine] = count
 
-    def record_wavu_consecutive(self, count: int) -> None:
-        self._wavu_current = count
-        if count > self._wavu_high:
-            self._wavu_high = count
+    def record_success(self) -> None:
+        self._times.append(time.perf_counter())
+        self._prune_times()
 
-    def record_wavu_success(self) -> None:
-        self._wavu_times.append(time.perf_counter())
-        self._prune_times(self._wavu_times)
+    def reset_streak(self) -> None:
+        self._current = 0
 
-    def reset_wavu_streak(self) -> None:
-        self._wavu_current = 0
+    def current(self) -> int:
+        return self._current
 
-    def _prune_times(self, times: deque[float]) -> None:
-        now = time.perf_counter()
-        while times and now - times[0] > FREQUENCY_WINDOW_SEC:
-            times.popleft()
+    def high(self, routine: Optional[str] = None) -> int:
+        return self._high_scores.get(routine or self._routine, 0)
 
-    def kbd_current(self) -> int:
-        return self._kbd_current
-
-    def kbd_high(self) -> int:
-        return self._kbd_high
-
-    def wavu_current(self) -> int:
-        return self._wavu_current
-
-    def wavu_high(self) -> int:
-        return self._wavu_high
-
-    def kbd_per_minute(self) -> float:
-        self._prune_times(self._kbd_times)
-        if not self._kbd_times:
+    def per_minute(self) -> float:
+        self._prune_times()
+        if not self._times:
             return 0.0
-        span = time.perf_counter() - self._kbd_times[0]
+        span = time.perf_counter() - self._times[0]
         if span <= 0:
             return 0.0
-        return len(self._kbd_times) / (span / 60.0)
-
-    def wavu_per_minute(self) -> float:
-        self._prune_times(self._wavu_times)
-        if not self._wavu_times:
-            return 0.0
-        span = time.perf_counter() - self._wavu_times[0]
-        if span <= 0:
-            return 0.0
-        return len(self._wavu_times) / (span / 60.0)
+        return len(self._times) / (span / 60.0)
 
     def reset_session(self) -> None:
-        """Reset current streaks and frequency timestamps. High scores are kept."""
-        self._kbd_current = 0
-        self._wavu_current = 0
-        self._kbd_times.clear()
-        self._wavu_times.clear()
+        """Reset current streak and frequency. High scores are kept."""
+        self._current = 0
+        self._times.clear()
 
     def save(self) -> None:
         """Persist high scores to disk. Call on app exit."""
         try:
             with open(self._persist_path, "w", encoding="utf-8") as f:
-                json.dump({"kbd_high": self._kbd_high, "wavu_high": self._wavu_high}, f)
+                json.dump(self._high_scores, f)
         except OSError:
             pass
+
+    def _prune_times(self) -> None:
+        now = time.perf_counter()
+        while self._times and now - self._times[0] > FREQUENCY_WINDOW_SEC:
+            self._times.popleft()
 
     def _load(self) -> None:
         if not self._persist_path.is_file():
@@ -112,7 +90,9 @@ class Scoring:
         try:
             with open(self._persist_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self._kbd_high = max(self._kbd_high, data.get("kbd_high", 0))
-            self._wavu_high = max(self._wavu_high, data.get("wavu_high", 0))
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    if isinstance(v, int) and v > self._high_scores.get(k, 0):
+                        self._high_scores[k] = v
         except (OSError, json.JSONDecodeError, TypeError):
             pass
