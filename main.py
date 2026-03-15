@@ -14,7 +14,7 @@ GAME_LOOP_MS = 16  # ~60 FPS
 
 def main() -> None:
     root = tk.Tk()
-    history = InputHistory(max_segments=120)
+    history = InputHistory(max_segments=600)
     scoring = Scoring()
     matcher = PatternMatcher(history, scoring)
     controller = ControllerReader()

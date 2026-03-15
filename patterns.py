@@ -92,11 +92,11 @@ class PatternMatcher:
         segs = self._history.segments_list()
         cycles = _count_tail_cycles(segs, self._pattern)
 
-        if cycles > 0 and cycles >= self._last_cycles:
+        if cycles > 0:
             self._scoring.record_consecutive(cycles)
             if cycles > self._last_cycles:
                 self._scoring.record_success()
-        else:
+        elif self._last_cycles > 0:
             self._scoring.reset_streak()
 
         self._last_cycles = cycles
