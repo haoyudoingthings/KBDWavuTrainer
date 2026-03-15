@@ -1,22 +1,17 @@
 """
 Pattern detection for configurable routines (KBD, wavu, etc.).
 Sliding window over input history; reports match and consecutive count.
-Add new routines by inserting an entry into the ROUTINES dict.
+Add new routines by inserting an entry into ROUTINES in config.py.
 """
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Sequence
 
+from config import DEFAULT_ROUTINE, ROUTINES
+
 if TYPE_CHECKING:
     from history import InputHistory
     from scoring import Scoring
-
-ROUTINES: dict[str, tuple[str, ...]] = {
-    "KBD":  ('b', 'n', 'b', 'db'),
-    "Wavu": ('f', 'n', 'd', 'df', 'n'),
-}
-
-DEFAULT_ROUTINE = "KBD"
 
 _MIRROR_LR: dict[str, str] = {
     "b": "f", "f": "b",
@@ -69,12 +64,10 @@ class PatternMatcher:
         self._last_cycles = 0
 
     def set_routine(self, name: str) -> None:
-        """Switch to a different routine pattern and reset cycle tracking."""
         self._routine = name
         self._rebuild_pattern()
 
     def set_side(self, p2: bool) -> None:
-        """Switch P1/P2 side. Mirrors the pattern so physical inputs match correctly."""
         self._p2 = p2
         self._rebuild_pattern()
 
@@ -84,11 +77,9 @@ class PatternMatcher:
         self._last_cycles = 0
 
     def reset(self) -> None:
-        """Clear cycle tracking. Call when history is cleared."""
         self._last_cycles = 0
 
     def update(self) -> None:
-        """Run after history is updated. Check tail for the active pattern."""
         segs = self._history.segments_list()
         cycles = _count_tail_cycles(segs, self._pattern)
 

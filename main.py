@@ -3,18 +3,18 @@ KBD / Wavu Trainer - Entry point.
 Starts controller polling, input history, pattern matcher, scoring, and GUI.
 """
 import tkinter as tk
+
+from config import GAME_LOOP_MS
 from controller import ControllerReader
 from history import InputHistory
 from patterns import PatternMatcher
 from scoring import Scoring
 from ui import TrainerWindow
 
-GAME_LOOP_MS = 16  # ~60 FPS
-
 
 def main() -> None:
     root = tk.Tk()
-    history = InputHistory(max_segments=600)
+    history = InputHistory()
     scoring = Scoring()
     matcher = PatternMatcher(history, scoring)
     controller = ControllerReader()

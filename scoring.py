@@ -9,19 +9,18 @@ from collections import deque
 from pathlib import Path
 from typing import Optional, Union
 
+from config import DEFAULT_ROUTINE, FREQUENCY_WINDOW_SEC, SCORES_FILENAME
+
 
 def _scores_path() -> Path:
-    return Path(__file__).resolve().parent / "scores.json"
-
-
-FREQUENCY_WINDOW_SEC = 60.0
+    return Path(__file__).resolve().parent / SCORES_FILENAME
 
 
 class Scoring:
     """Tracks current streak, per-routine high scores, and success frequency."""
 
     def __init__(self, persist_path: Optional[Union[Path, str]] = None,
-                 routine: str = "KBD") -> None:
+                 routine: str = DEFAULT_ROUTINE) -> None:
         self._persist_path = Path(persist_path) if persist_path else _scores_path()
         self._routine = routine
         self._current = 0
@@ -34,7 +33,6 @@ class Scoring:
         return self._routine
 
     def set_routine(self, name: str) -> None:
-        """Switch active routine. Resets current streak and frequency."""
         self._routine = name
         self._current = 0
         self._times.clear()
@@ -67,12 +65,10 @@ class Scoring:
         return len(self._times) / (span / 60.0)
 
     def reset_session(self) -> None:
-        """Reset current streak and frequency. High scores are kept."""
         self._current = 0
         self._times.clear()
 
     def save(self) -> None:
-        """Persist high scores to disk. Call on app exit."""
         try:
             with open(self._persist_path, "w", encoding="utf-8") as f:
                 json.dump(self._high_scores, f)

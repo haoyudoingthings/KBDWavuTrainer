@@ -7,30 +7,28 @@ import tkinter as tk
 import tkinter.font as tkfont
 from typing import TYPE_CHECKING, Callable
 
-from patterns import ROUTINES, DEFAULT_ROUTINE
+from config import (
+    COMBO_FONT,
+    DEFAULT_ROUTINE,
+    DIRECTION_SYMBOLS,
+    HISTORY_CANVAS_HEIGHT,
+    HISTORY_COLUMN_GAP,
+    HISTORY_NUM_FONT,
+    HISTORY_NUM_OFFSET,
+    HISTORY_RIGHT_MARGIN,
+    HISTORY_SYM_FONT,
+    HISTORY_SYM_OFFSET,
+    REFRESH_INTERVAL_MS,
+    ROUTINES,
+    WINDOW_MIN_H,
+    WINDOW_MIN_W,
+    WINDOW_TITLE,
+)
 
 if TYPE_CHECKING:
     from controller import ControllerReader
     from history import InputHistory
     from scoring import Scoring
-
-DIRECTION_SYMBOLS = {
-    "b": "\u2190",   # ←
-    "f": "\u2192",   # →
-    "u": "\u2191",   # ↑
-    "d": "\u2193",   # ↓
-    "db": "\u2199",  # ↙
-    "df": "\u2198",  # ↘
-    "ub": "\u2196",  # ↖
-    "uf": "\u2197",  # ↗
-    "n": "\u00b7",   # ·
-}
-REFRESH_INTERVAL_MS = 66  # ~15 FPS
-SYM_FONT_SPEC = ("Segoe UI", 11)
-NUM_FONT_SPEC = ("Consolas", 8)
-COLUMN_GAP = 4
-COMBO_FONT = ("Segoe UI", 14, "bold")
-TITLE_BASE = "KBD / Wavu Trainer"
 
 
 class TrainerWindow:
@@ -52,10 +50,10 @@ class TrainerWindow:
         self._on_switch = on_switch
         self._on_side = on_side
 
-        root.title(TITLE_BASE)
+        root.title(WINDOW_TITLE)
         root.resizable(True, True)
         root.attributes("-topmost", True)
-        root.minsize(260, 100)
+        root.minsize(WINDOW_MIN_W, WINDOW_MIN_H)
 
         # --- Menu bar ---
         menubar = tk.Menu(root)
@@ -89,10 +87,10 @@ class TrainerWindow:
         self._combo_label.pack(fill=tk.X, pady=(2, 0))
 
         # --- Horizontal input history canvas ---
-        self._canvas = tk.Canvas(root, height=40, highlightthickness=0)
+        self._canvas = tk.Canvas(root, height=HISTORY_CANVAS_HEIGHT, highlightthickness=0)
         self._canvas.pack(fill=tk.BOTH, expand=True)
-        self._sym_font = tkfont.Font(family=SYM_FONT_SPEC[0], size=SYM_FONT_SPEC[1])
-        self._num_font = tkfont.Font(family=NUM_FONT_SPEC[0], size=NUM_FONT_SPEC[1])
+        self._sym_font = tkfont.Font(family=HISTORY_SYM_FONT[0], size=HISTORY_SYM_FONT[1])
+        self._num_font = tkfont.Font(family=HISTORY_NUM_FONT[0], size=HISTORY_NUM_FONT[1])
 
         self._start_refresh_loop()
 
@@ -110,17 +108,14 @@ class TrainerWindow:
         self._root.after(REFRESH_INTERVAL_MS, self._start_refresh_loop)
 
     def _refresh_ui(self) -> None:
-        # --- Title bar connection status ---
         status = "Connected" if self._controller.connected else "Disconnected"
-        self._root.title(f"{TITLE_BASE} \u2014 {status}")
+        self._root.title(f"{WINDOW_TITLE} \u2014 {status}")
 
-        # --- Combo ---
         routine = self._scoring.routine
         cur = self._scoring.current()
         best = self._scoring.high()
         self._combo_label.configure(text=f"{routine}: {cur} (best {best})")
 
-        # --- Horizontal history (symbol on top, frame count below) ---
         self._canvas.delete("all")
         segs = self._history.segments_list()
         cur_dir, cur_frames = self._history.current_segment()
@@ -130,9 +125,9 @@ class TrainerWindow:
 
         canvas_w = self._canvas.winfo_width()
         canvas_h = self._canvas.winfo_height()
-        sym_y = canvas_h // 2 - 7
-        num_y = canvas_h // 2 + 9
-        x = canvas_w - 4
+        sym_y = canvas_h // 2 + HISTORY_SYM_OFFSET
+        num_y = canvas_h // 2 + HISTORY_NUM_OFFSET
+        x = canvas_w - HISTORY_RIGHT_MARGIN
         for d, n in reversed(entries):
             sym = DIRECTION_SYMBOLS.get(d, d)
             num_str = str(n)
@@ -140,6 +135,6 @@ class TrainerWindow:
             cx = x - col_w // 2
             self._canvas.create_text(cx, sym_y, text=sym, font=self._sym_font)
             self._canvas.create_text(cx, num_y, text=num_str, font=self._num_font)
-            x -= col_w + COLUMN_GAP
+            x -= col_w + HISTORY_COLUMN_GAP
             if x < 0:
                 break

@@ -1,6 +1,6 @@
 """
 XInput controller polling and mapping to 8 directions + neutral.
-Polls at 60 FPS and queues directions for the main thread to consume.
+Polls at configurable FPS and queues directions for the main thread.
 """
 from __future__ import annotations
 
@@ -9,13 +9,12 @@ import threading
 import time
 from typing import Optional
 
+from config import DEFAULT_CONTROLLER_SLOT, POLL_FPS, STICK_THRESHOLD
+
 try:
     import XInput
 except ImportError:
     XInput = None  # type: ignore
-
-DIRECTIONS = ("b", "f", "u", "d", "db", "df", "ub", "uf")
-STICK_THRESHOLD = 0.35
 
 _STICK_MAP: dict[tuple[int, int], str] = {
     (-1, 0): "b",
@@ -61,11 +60,9 @@ def _dpad_to_direction(buttons: dict) -> Optional[str]:
 
 
 class ControllerReader:
-    """Polls an XInput controller at 60 FPS and queues directions."""
+    """Polls an XInput controller and queues directions."""
 
-    MAX_SLOTS = 4
-
-    def __init__(self, user_index: int = 0):
+    def __init__(self, user_index: int = DEFAULT_CONTROLLER_SLOT):
         self._user_index = user_index
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -78,11 +75,9 @@ class ControllerReader:
 
     @property
     def connected(self) -> bool:
-        """Whether the currently selected controller slot is connected (updated by poll thread)."""
         return self._connected
 
     def set_user_index(self, index: int) -> None:
-        """Switch to a different controller slot. Drains stale readings from the queue."""
         self._user_index = index
         self._connected = False
         while not self._queue.empty():
@@ -93,7 +88,6 @@ class ControllerReader:
 
     @staticmethod
     def get_connected_slots() -> list[int]:
-        """Return list of slot indices (0-3) that have a controller connected."""
         if XInput is None:
             return []
         try:
@@ -102,7 +96,6 @@ class ControllerReader:
             return []
 
     def get_current_direction(self) -> Optional[str]:
-        """Return current 8-way direction from left stick or D-pad, or None if neutral."""
         if XInput is None:
             self._connected = False
             return None
@@ -120,7 +113,6 @@ class ControllerReader:
         return direction
 
     def start_polling(self) -> None:
-        """Start background thread that polls at ~60 FPS and queues directions."""
         if self._running:
             return
         self._running = True
@@ -128,14 +120,12 @@ class ControllerReader:
         self._thread.start()
 
     def stop_polling(self) -> None:
-        """Stop the polling thread."""
         self._running = False
         if self._thread is not None:
             self._thread.join(timeout=0.5)
             self._thread = None
 
     def drain(self) -> list[Optional[str]]:
-        """Return all queued directions since last drain, clearing the queue."""
         items: list[Optional[str]] = []
         while True:
             try:
@@ -145,7 +135,7 @@ class ControllerReader:
         return items
 
     def _poll_loop(self) -> None:
-        interval = 1.0 / 60.0
+        interval = 1.0 / POLL_FPS
         while self._running:
             start = time.perf_counter()
             self._queue.put(self.get_current_direction())
