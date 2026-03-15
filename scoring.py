@@ -4,6 +4,7 @@ Streak tracking and per-routine high scores with optional JSON persistence.
 from __future__ import annotations
 
 import json
+import sys
 import time
 from collections import deque
 from pathlib import Path
@@ -13,7 +14,11 @@ from config import DEFAULT_ROUTINE, FREQUENCY_WINDOW_SEC, SCORES_FILENAME
 
 
 def _scores_path() -> Path:
-    return Path(__file__).resolve().parent / SCORES_FILENAME
+    if getattr(sys, "frozen", False):
+        base = Path(sys.executable).resolve().parent
+    else:
+        base = Path(__file__).resolve().parent
+    return base / SCORES_FILENAME
 
 
 class Scoring:

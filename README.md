@@ -20,12 +20,12 @@ Lightweight Windows overlay to practice Korean Back Dash (KBD) and wave dash (wa
 2. Use an XInput-compatible controller (Xbox or generic "Xbox mode" gamepad). DualShock users can use DS4Windows to expose the pad as XInput.
 3. Run the app: `python main.py`
 
-## TODO
+## Building a standalone executable
 
-- [ ] Read input from controller
-- [ ] Display input history from controller
-- [ ] Check if the input history forms successful KBD / wavu input
-- [ ] Current / Highest KBD / wavu streak
-- [ ] Show a combo score like DMC
-- [ ] Pin to top
-- [ ] Show input with Tekken icons
+You can package the app into a single `.exe` that runs on any Windows 10+ machine without Python installed.
+
+1. Install build dependencies: `pip install -r requirements.txt`
+2. Run the build script: `build.bat`
+3. The executable is created at `dist/KBDWavuTrainer.exe`.
+
+High scores (`scores.json`) are saved next to the `.exe` at runtime.
