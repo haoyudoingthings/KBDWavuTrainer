@@ -1,0 +1,68 @@
+"""
+KBD / Wavu Trainer - Entry point.
+Starts controller polling, input history, pattern matcher, scoring, and GUI.
+"""
+import ctypes
+import sys
+import tkinter as tk
+
+from config import GAME_LOOP_MS
+
+if sys.platform == "win32":
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # per-monitor DPI aware
+    except Exception:
+        pass
+from controller import ControllerReader
+from history import InputHistory
+from patterns import PatternMatcher
+from scoring import Scoring
+from ui import TrainerWindow
+
+
+def main() -> None:
+    root = tk.Tk()
+    history = InputHistory()
+    scoring = Scoring()
+    matcher = PatternMatcher(history, scoring)
+    controller = ControllerReader()
+
+    def reset_session() -> None:
+        history.clear()
+        scoring.reset_session()
+        matcher.reset()
+
+    def switch_routine(name: str) -> None:
+        history.clear()
+        scoring.set_routine(name)
+        matcher.set_routine(name)
+
+    def set_side(p2: bool) -> None:
+        history.clear()
+        scoring.reset_session()
+        matcher.set_side(p2)
+
+    app = TrainerWindow(root, history, scoring, controller,
+                        on_reset=reset_session, on_switch=switch_routine,
+                        on_side=set_side)
+    controller.start_polling()
+
+    def game_loop() -> None:
+        for direction in controller.drain():
+            history.tick(direction)
+            matcher.update()
+        root.after(GAME_LOOP_MS, game_loop)
+
+    root.after(GAME_LOOP_MS, game_loop)
+    root.protocol("WM_DELETE_WINDOW", lambda: shutdown(root, controller, scoring))
+    root.mainloop()
+
+
+def shutdown(root: tk.Tk, controller: ControllerReader, scoring: Scoring) -> None:
+    controller.stop_polling()
+    scoring.save()
+    root.destroy()
+
+
+if __name__ == "__main__":
+    main()
