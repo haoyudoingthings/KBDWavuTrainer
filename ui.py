@@ -11,6 +11,7 @@ from config import (
     COMBO_FONT,
     DEFAULT_ROUTINE,
     DIRECTION_SYMBOLS,
+    DISPLAY_MAX_FRAMES,
     HISTORY_CANVAS_HEIGHT,
     HISTORY_COLUMN_GAP,
     HISTORY_NUM_FONT,
@@ -130,7 +131,7 @@ class TrainerWindow:
         x = canvas_w - HISTORY_RIGHT_MARGIN
         for d, n in reversed(entries):
             sym = DIRECTION_SYMBOLS.get(d, d)
-            num_str = str(n)
+            num_str = str(min(n, DISPLAY_MAX_FRAMES) if DISPLAY_MAX_FRAMES > 0 else n)
             col_w = max(self._sym_font.measure(sym), self._num_font.measure(num_str))
             cx = x - col_w // 2
             self._canvas.create_text(cx, sym_y, text=sym, font=self._sym_font)

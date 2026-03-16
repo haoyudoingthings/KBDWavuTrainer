@@ -15,7 +15,9 @@ class InputHistory:
     """Stores recent input segments (direction, duration_frames) with a max capacity."""
 
     def __init__(self, max_segments: int = MAX_SEGMENTS):
-        self._segments: deque[tuple[str, int]] = deque(maxlen=max_segments)
+        self._segments: deque[tuple[str, int]] = deque(
+            maxlen=max_segments if max_segments > 0 else None,
+        )
         self._current_direction: Optional[str] = None
         self._current_frames: int = 0
 

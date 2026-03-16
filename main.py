@@ -2,9 +2,17 @@
 KBD / Wavu Trainer - Entry point.
 Starts controller polling, input history, pattern matcher, scoring, and GUI.
 """
+import ctypes
+import sys
 import tkinter as tk
 
 from config import GAME_LOOP_MS
+
+if sys.platform == "win32":
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # per-monitor DPI aware
+    except Exception:
+        pass
 from controller import ControllerReader
 from history import InputHistory
 from patterns import PatternMatcher

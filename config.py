@@ -19,7 +19,8 @@ DEFAULT_CONTROLLER_SLOT = 0     # XInput slot index (0–3)
 # ---------------------------------------------------------------------------
 # Input history
 # ---------------------------------------------------------------------------
-MAX_SEGMENTS = 600              # Max direction segments kept in history
+MAX_SEGMENTS = 0                # Max direction segments kept in history (0 = unlimited)
+DISPLAY_MAX_FRAMES = 99        # Cap the frame count shown in the history display (0 = no cap)
 
 # ---------------------------------------------------------------------------
 # Routines (pattern sequences)
